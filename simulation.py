@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.colors import hsv_to_rgb
 
-# ==============================================================================
-# 0. RUNTIME CONFIGURATION
-# ==============================================================================
+
+# 0. RUNTIME CONFIG
+
 print("="*60)
 print("Barrier Configuration:")
 print("  0. No barriers (free propagation)")
@@ -41,9 +41,9 @@ if backend == 'cupy':
 else:
     xp = _np
 
-# ==============================================================================
-# 1. MATPLOTLIB CONFIGURATION (Neon Green on Dark Background)
-# ==============================================================================
+
+# 1. MATPLOTLIB CONFIG
+
 plt.style.use('dark_background')
 plt.rcParams['text.color'] = '#00ff00'
 plt.rcParams['axes.labelcolor'] = '#00ff00'
@@ -54,9 +54,9 @@ plt.rcParams['axes.facecolor'] = '#000000'
 plt.rcParams['figure.facecolor'] = '#000000'
 plt.rcParams['axes.edgecolor'] = '#333333'
 
-# ==============================================================================
+
 # 2. PHYSICAL CONSTANTS (Atomic Units: hbar = m_e = e = 1)
-# ==============================================================================
+
 hbar = 1.0
 m_e  = 1.0
 
@@ -65,9 +65,9 @@ m_e  = 1.0
 eV = 0.03674932217565499  # 1 electron-volt in Hartree (Eₕ)
 # 1 atomic unit of time = hbar/Eₕ ≈ 24.188 attoseconds
 
-# ==============================================================================
+
 # 3. SIMULATION GRID & POTENTIAL SETUP
-# ==============================================================================
+
 extent = 700 * Å
 x = xp.linspace(-extent/2, extent/2, N, endpoint=False)
 y = xp.linspace(-extent/2, extent/2, N, endpoint=False)
@@ -78,8 +78,6 @@ a  = 3 * Å       # barrier width
 b  = 5 * Å       # inter-barrier gap
 V0 = 1.7 * eV   # barrier height
 
-# FIX 1+2: use complex64 so imaginary potentials (absorbing boundaries) never
-# silently lose their imaginary part, and to cut RAM vs complex128.
 V = xp.zeros((N, N), dtype=xp.complex64)
 
 if num_barriers >= 1:
@@ -88,9 +86,8 @@ if num_barriers >= 1:
 if num_barriers >= 2:
     V = xp.where((X > a + b) & (X < a + b + a), V0.astype(xp.complex64) if hasattr(V0, 'astype') else xp.complex64(V0), V)
 
-# ==============================================================================
 # 4. INITIAL WAVEFUNCTION SETUP
-# ==============================================================================
+
 E0   = 0.8 * eV
 σ    = 25.0 * Å
 k_x0 = xp.sqrt(2 * m_e * E0) / hbar
@@ -111,11 +108,11 @@ def normalize(psi_arr):
 
 psi = normalize(psi)
 
-# ==============================================================================    
-# 5. SPLIT-STEP FOURIER ENGINE
-# ==============================================================================
-# FIX 5: time in explicit atomic units. 4000 a.u. ≈ 97 femtoseconds.
-TOTAL_TIME_AU = 4000   # atomic units of time (1 a.u. ≈ 24.188 attoseconds)
+
+# 5. SPLIT-STEP FOURIER 
+
+
+TOTAL_TIME_AU = 4000   
 num_steps      = 8000
 dt             = TOTAL_TIME_AU / num_steps
 store_steps    = 800
@@ -158,9 +155,8 @@ for step in range(1, num_steps + 1):
 
 print("\nSimulation finished successfully. Rendering animation plot...")
 
-# ==============================================================================
 # 5B. EXPORT PROMPT
-# ==============================================================================
+
 print("\n" + "="*60)
 print("Export Options:")
 print("  1. GIF (Pillow)")
@@ -169,13 +165,10 @@ print("  3. No Export")
 print("="*60)
 export_choice = input("Select export format (1/2/3): ").strip()
 
-# ==============================================================================
 # 6. HSV WAVEFUNCTION VISUALIZATION
-# ==============================================================================
+
 fig, ax = plt.subplots(figsize=(8, 8))
 
-# FIX 3 (max_amp): compute per-frame so the color scale tracks the actual
-# wavefunction peak rather than staying frozen at frame 0's amplitude.
 def psi_to_rgb_dark_bg(psi_matrix):
     amplitude = xp.abs(psi_matrix)
     phase     = xp.angle(psi_matrix)
@@ -230,9 +223,8 @@ ani = animation.FuncAnimation(
     blit=False
 )
 
-# ==============================================================================
-# EXPORT
-# ==============================================================================
+# EXPORT :)
+
 if export_choice == '1':
     print("Encoding and saving animation to GIF...")
     ani.save('quantum_tunneling.gif', writer='pillow', fps=60)
