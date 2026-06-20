@@ -127,9 +127,29 @@ T = (hbar**2 / (2 * m_e)) * (Kx**2 + Ky**2)
 exp_V = xp.exp(-1j * V * (dt / 2.0) / hbar).astype(xp.complex64)
 exp_T = xp.exp(-1j * T * dt / hbar).astype(xp.complex64)
 
-frames = [psi.copy()]
-
 RENORM_INTERVAL = 200   # renormalize every this many steps to suppress drift
+
+def psi_to_rgb_dark_bg(psi_matrix):
+    amplitude = xp.abs(psi_matrix)
+    phase     = xp.angle(psi_matrix)
+
+    # Per-frame normalization: peak amplitude always maps to full brightness
+    max_amp = float(xp.max(amplitude)) * 0.3 if float(xp.max(amplitude)) > 0 else 1.0
+
+    H = (phase + xp.pi) / (2 * xp.pi)
+    S = xp.ones_like(H)
+    V_ch = xp.minimum((amplitude / max_amp) ** 2, 1.0)
+
+    hsv = xp.stack([H, S, V_ch], axis=-1)
+    if xp is not _np:
+        hsv = hsv.get()
+    rgb = hsv_to_rgb(_np.array(hsv, dtype=_np.float32))
+    return (rgb * 255).astype(_np.uint8)
+
+# Frames are converted to uint8 RGB images at storage time rather than kept as
+# raw complex psi arrays — avoids holding hundreds of full-resolution complex64
+# grids in memory and avoids re-running the HSV conversion on every render/export pass.
+frames = [psi_to_rgb_dark_bg(psi)]
 
 print("Evaluating time evolution steps:")
 for step in range(1, num_steps + 1):
@@ -144,7 +164,7 @@ for step in range(1, num_steps + 1):
         psi = normalize(psi)
 
     if step % steps_per_frame == 0:
-        frames.append(psi.copy())
+        frames.append(psi_to_rgb_dark_bg(psi))
 
     if step % 80 == 0 or step == num_steps:
         percent = (step / num_steps) * 100
@@ -169,24 +189,8 @@ export_choice = input("Select export format (1/2/3): ").strip()
 
 fig, ax = plt.subplots(figsize=(8, 8))
 
-def psi_to_rgb_dark_bg(psi_matrix):
-    amplitude = xp.abs(psi_matrix)
-    phase     = xp.angle(psi_matrix)
-
-    # Per-frame normalization: peak amplitude always maps to full brightness
-    max_amp = float(xp.max(amplitude)) * 0.3 if float(xp.max(amplitude)) > 0 else 1.0
-
-    H = (phase + xp.pi) / (2 * xp.pi)
-    S = xp.ones_like(H)
-    V_ch = xp.minimum((amplitude / max_amp) ** 2, 1.0)
-
-    hsv = xp.stack([H, S, V_ch], axis=-1)
-    if xp is not _np:
-        hsv = hsv.get()
-    return hsv_to_rgb(_np.array(hsv, dtype=_np.float32))
-
 spatial_extent_Å = [-extent/(2*Å), extent/(2*Å), -extent/(2*Å), extent/(2*Å)]
-img = ax.imshow(psi_to_rgb_dark_bg(frames[0]), extent=spatial_extent_Å, origin='lower')
+img = ax.imshow(frames[0], extent=spatial_extent_Å, origin='lower')
 
 # Potential barrier overlays
 if num_barriers >= 1:
@@ -212,7 +216,7 @@ if num_barriers > 0:
         text.set_color('#00ff00')
 
 def animate_frame(idx):
-    img.set_data(psi_to_rgb_dark_bg(frames[idx]))
+    img.set_data(frames[idx])
     return [img]
 
 ani = animation.FuncAnimation(
